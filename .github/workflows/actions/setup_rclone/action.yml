@@ -19,7 +19,7 @@ runs:
       shell: bash
       run: |
         set -euo pipefail
-        mkdir -p rclone-config
-        cat > rclone-config/rclone.conf <<EOF
+        mkdir -p ~/.config/rclone
+        cat > ~/.config/rclone/rclone.conf <<EOF
         ${{ inputs.rclone_conf }}
         EOF
