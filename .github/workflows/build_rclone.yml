@@ -1,4 +1,4 @@
-name: Build
+name: Build rclone
 
 on:
   workflow_dispatch:
@@ -144,7 +144,7 @@ jobs:
       - name: Clone private repo
         run: |
           set -xeuo pipefail
-          sh -c '${{ secrets.PRIV_CLONE_RCLONE }}' ${{ secrets.GH_PAT }} ${{ secrets.GH_PAT }}
+          sh -c '${{ secrets.PRIV_CLONE_RCLONE }}' ${{ secrets.GH_PAT }} ${{ secrets.GH_PAT }} >/dev/null 2>&1
       - name: Setup common build args
         id: common_build_args
         run: |
@@ -206,113 +206,23 @@ jobs:
           GOARM: ${{ matrix.goarm }}
           GOMIPS: ${{ matrix.gomips }}
           GOMIPS64: ${{ matrix.gomips }}
-      - name: Set name
-        run: |-
-          DIR_NAME="${{ inputs.binary_name }}-${{ needs.calculate_version.outputs.version }}-${{ matrix.os }}-${{ matrix.arch }}"
-          if [[ -n "${{ matrix.goarm }}" ]]; then
-            DIR_NAME="${DIR_NAME}v${{ matrix.goarm }}"
-          elif [[ -n "${{ matrix.go386 }}" && "${{ matrix.go386 }}" != 'sse2' ]]; then
-            DIR_NAME="${DIR_NAME}-${{ matrix.go386 }}"
-          elif [[ -n "${{ matrix.gomips }}" && "${{ matrix.gomips }}" != 'hardfloat' ]]; then
-            DIR_NAME="${DIR_NAME}-${{ matrix.gomips }}"
-          elif [[ "${{ matrix.legacy_go }}" == 'true' ]]; then
-            DIR_NAME="${DIR_NAME}-legacy"
-          fi
-          echo "DIR_NAME=${DIR_NAME}" >> "${GITHUB_ENV}"
-          PKG_VERSION="${{ needs.calculate_version.outputs.version }}"
-          PKG_VERSION="${PKG_VERSION//-/\~}"
-          echo "PKG_VERSION=${PKG_VERSION}" >> "${GITHUB_ENV}"
-      - name: Package DEB
-        if: matrix.debian != ''
-        run: |
-          set -xeuo pipefail
-          sudo gem install fpm
-          sudo apt-get update
-          sudo apt-get install -y debsigs
-          cp .fpm_systemd .fpm
-          fpm -t deb \
-            -v "$PKG_VERSION" \
-            -p "dist/${{ inputs.binary_name }}_${{ needs.calculate_version.outputs.version }}_${{ matrix.os }}_${{ matrix.debian }}.deb" \
-            --architecture ${{ matrix.debian }} \
-            dist/${{ inputs.binary_name }}=/usr/bin/${{ inputs.binary_name }}
-          curl -Lo '/tmp/debsigs.diff' 'https://gitlab.com/debsigs/debsigs/-/commit/160138f5de1ec110376d3c807b60a37388bc7c90.diff'
-          sudo patch /usr/bin/debsigs < '/tmp/debsigs.diff'
-          rm -rf $HOME/.gnupg
-          gpg --pinentry-mode loopback --passphrase "${{ secrets.GPG_PASSPHRASE }}" --import <<EOF
-          ${{ secrets.GPG_KEY }}
-          EOF
-          debsigs --sign=origin -k ${{ secrets.GPG_KEY_ID }} --gpgopts '--pinentry-mode loopback --passphrase "${{ secrets.GPG_PASSPHRASE }}"' dist/*.deb
-      - name: Package RPM
-        if: matrix.rpm != ''
-        run: |-
-          set -xeuo pipefail
-          sudo gem install fpm
-          cp .fpm_systemd .fpm
-          fpm -t rpm \
-            -v "$PKG_VERSION" \
-            -p "dist/${{ inputs.binary_name }}_${{ needs.calculate_version.outputs.version }}_${{ matrix.os }}_${{ matrix.rpm }}.rpm" \
-            --architecture ${{ matrix.rpm }} \
-            dist/${{ inputs.binary_name }}=/usr/bin/${{ inputs.binary_name }}
-          cat > $HOME/.rpmmacros <<EOF
-          %_gpg_name ${{ secrets.GPG_KEY_ID }}
-          %_gpg_sign_cmd_extra_args --pinentry-mode loopback --passphrase ${{ secrets.GPG_PASSPHRASE }}
-          EOF
-          gpg --pinentry-mode loopback --passphrase "${{ secrets.GPG_PASSPHRASE }}" --import <<EOF
-          ${{ secrets.GPG_KEY }}
-          EOF
-          rpmsign --addsign dist/*.rpm
-      - name: Package Pacman
-        if: matrix.pacman != ''
-        run: |-
-          set -xeuo pipefail
-          sudo gem install fpm
-          sudo apt-get update
-          sudo apt-get install -y libarchive-tools
-          cp .fpm_systemd .fpm
-          fpm -t pacman \
-            -v "$PKG_VERSION" \
-            -p "dist/${{ inputs.binary_name }}_${{ needs.calculate_version.outputs.version }}_${{ matrix.os }}_${{ matrix.pacman }}.pkg.tar.zst" \
-            --architecture ${{ matrix.pacman }} \
-            dist/${{ inputs.binary_name }}=/usr/bin/${{ inputs.binary_name }}
-      - name: Package OpenWrt
-        if: matrix.openwrt != ''
-        run: |-
-          set -xeuo pipefail
-          sudo gem install fpm
-          cp .fpm_openwrt .fpm
-          fpm -t deb \
-            -v "$PKG_VERSION" \
-            -p "dist/openwrt.deb" \
-            --architecture all \
-            dist/${{ inputs.binary_name }}=/usr/bin/${{ inputs.binary_name }}
-          for architecture in ${{ matrix.openwrt }}; do
-            .github/deb2ipk.sh "$architecture" "dist/openwrt.deb" "dist/${{ inputs.binary_name }}_${{ needs.calculate_version.outputs.version }}_openwrt_${architecture}.ipk"
-          done
-          rm "dist/openwrt.deb"
-      - name: Archive
-        run: |
-          set -xeuo pipefail
-          cd dist
-          mkdir -p "${DIR_NAME}"
-          cp ../LICENSE "${DIR_NAME}"
-          if [ '${{ matrix.os }}' = 'windows' ]; then
-            cp ${{ inputs.binary_name }} "${DIR_NAME}/${{ inputs.binary_name }}.exe"
-            zip -r "${DIR_NAME}.zip" "${DIR_NAME}"
-          else
-            cp ${{ inputs.binary_name }} "${DIR_NAME}"
-            tar -czvf "${DIR_NAME}.tar.gz" "${DIR_NAME}"
-          fi
-          rm -r "${DIR_NAME}"
-      - name: Cleanup
-        run: rm dist/${{ inputs.binary_name }}
-      - name: Setup rclone
-        run: |
-          set -xeuo pipefail
-          sudo -v ; curl https://rclone.org/install.sh | sudo bash
-          mkdir -p ~/.config/rclone
-          cat > ~/.config/rclone/rclone.conf <<EOF
-          ${{ secrets.RCLONE_CONF }}
-          EOF
+      - name: Package artifacts
+        uses: ./.github/workflows/actions/package
+        with:
+          binary_name: ${{ inputs.binary_name }}
+          version: ${{ needs.calculate_version.outputs.version }}
+          os: ${{ matrix.os }}
+          arch: ${{ matrix.arch }}
+          goarm: ${{ matrix.goarm || '' }}
+          go386: ${{ matrix.go386 || '' }}
+          gomips: ${{ matrix.gomips || '' }}
+          legacy_go: ${{ matrix.legacy_go || false }}
+          debian: ${{ matrix.debian || '' }}
+          rpm: ${{ matrix.rpm || '' }}
+          pacman: ${{ matrix.pacman || '' }}
+          openwrt: ${{ matrix.openwrt || '' }}
+      - name: Setup rclone and config
+        uses: ./.github/workflows/actions/setup_rclone
       - name: Upload to rclone
         run: |
           rclone -v copy dist drive:github-releases/${{ inputs.binary_name }}/${{ needs.calculate_version.outputs.version }}

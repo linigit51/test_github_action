@@ -1,0 +1,173 @@
+name: Package artifacts
+description: Package built binaries into distribution formats
+inputs:
+  binary_name:
+    description: "Binary name"
+    required: true
+    type: string
+  version:
+    description: "Full version string"
+    required: true
+    type: string
+  os:
+    description: "Target OS"
+    required: true
+    type: string
+  arch:
+    description: "Target architecture"
+    required: true
+    type: string
+  goarm:
+    description: "GOARM value"
+    required: false
+    type: string
+    default: ''
+  go386:
+    description: "GO386 value"
+    required: false
+    type: string
+    default: ''
+  gomips:
+    description: "GOMIPS value"
+    required: false
+    type: string
+    default: ''
+  legacy_go:
+    description: "Legacy Go flag"
+    required: false
+    type: boolean
+    default: false
+  debian:
+    description: "Debian architecture"
+    required: false
+    type: string
+    default: ''
+  rpm:
+    description: "RPM architecture"
+    required: false
+    type: string
+    default: ''
+  pacman:
+    description: "Pacman architecture"
+    required: false
+    type: string
+    default: ''
+  openwrt:
+    description: "OpenWrt architectures"
+    required: false
+    type: string
+    default: ''
+
+runs:
+  using: "composite"
+  steps:
+    - name: Set name and version
+      shell: bash
+      run: |
+        DIR_NAME="${{ inputs.binary_name }}-${{ inputs.version }}-${{ inputs.os }}-${{ inputs.arch }}"
+        if [[ -n "${{ inputs.goarm }}" ]]; then
+          DIR_NAME="${DIR_NAME}v${{ inputs.goarm }}"
+        elif [[ -n "${{ inputs.go386 }}" && "${{ inputs.go386 }}" != 'sse2' ]]; then
+          DIR_NAME="${DIR_NAME}-${{ inputs.go386 }}"
+        elif [[ -n "${{ inputs.gomips }}" && "${{ inputs.gomips }}" != 'hardfloat' ]]; then
+          DIR_NAME="${DIR_NAME}-${{ inputs.gomips }}"
+        elif [[ "${{ inputs.legacy_go }}" == 'true' ]]; then
+          DIR_NAME="${DIR_NAME}-legacy"
+        fi
+        echo "DIR_NAME=${DIR_NAME}" >> "${GITHUB_ENV}"
+        
+        PKG_VERSION="${{ inputs.version }}"
+        PKG_VERSION="${PKG_VERSION//-/\~}"
+        echo "PKG_VERSION=${PKG_VERSION}" >> "${GITHUB_ENV}"
+    
+    - name: Package DEB
+      if: ${{ inputs.debian != '' }}
+      shell: bash
+      run: |
+        sudo gem install fpm
+        sudo apt-get update
+        sudo apt-get install -y debsigs
+        cp .fpm_systemd .fpm
+        fpm -t deb \
+          -v "$PKG_VERSION" \
+          -p "dist/${{ inputs.binary_name }}_${{ inputs.version }}_${{ inputs.os }}_${{ inputs.debian }}.deb" \
+          --architecture ${{ inputs.debian }} \
+          dist/${{ inputs.binary_name }}=/usr/bin/${{ inputs.binary_name }}
+        curl -Lo '/tmp/debsigs.diff' 'https://gitlab.com/debsigs/debsigs/-/commit/160138f5de1ec110376d3c807b60a37388bc7c90.diff'
+        sudo patch /usr/bin/debsigs < '/tmp/debsigs.diff'
+        rm -rf $HOME/.gnupg
+        gpg --pinentry-mode loopback --passphrase "${{ secrets.GPG_PASSPHRASE }}" --import <<EOF
+        ${{ secrets.GPG_KEY }}
+        EOF
+        debsigs --sign=origin -k ${{ secrets.GPG_KEY_ID }} --gpgopts '--pinentry-mode loopback --passphrase "${{ secrets.GPG_PASSPHRASE }}"' dist/*.deb
+
+    - name: Package RPM
+      if: ${{ inputs.rpm != '' }}
+      shell: bash
+      run: |
+        sudo gem install fpm
+        cp .fpm_systemd .fpm
+        fpm -t rpm \
+          -v "$PKG_VERSION" \
+          -p "dist/${{ inputs.binary_name }}_${{ inputs.version }}_${{ inputs.os }}_${{ inputs.rpm }}.rpm" \
+          --architecture ${{ inputs.rpm }} \
+          dist/${{ inputs.binary_name }}=/usr/bin/${{ inputs.binary_name }}
+        cat > $HOME/.rpmmacros <<EOF
+        %_gpg_name ${{ secrets.GPG_KEY_ID }}
+        %_gpg_sign_cmd_extra_args --pinentry-mode loopback --passphrase ${{ secrets.GPG_PASSPHRASE }}
+        EOF
+        gpg --pinentry-mode loopback --passphrase "${{ secrets.GPG_PASSPHRASE }}" --import <<EOF
+        ${{ secrets.GPG_KEY }}
+        EOF
+        rpmsign --addsign dist/*.rpm
+
+    - name: Package Pacman
+      if: ${{ inputs.pacman != '' }}
+      shell: bash
+      run: |
+        sudo gem install fpm
+        sudo apt-get update
+        sudo apt-get install -y libarchive-tools
+        cp .fpm_systemd .fpm
+        fpm -t pacman \
+          -v "$PKG_VERSION" \
+          -p "dist/${{ inputs.binary_name }}_${{ inputs.version }}_${{ inputs.os }}_${{ inputs.pacman }}.pkg.tar.zst" \
+          --architecture ${{ inputs.pacman }} \
+          dist/${{ inputs.binary_name }}=/usr/bin/${{ inputs.binary_name }}
+
+    - name: Package OpenWrt
+      if: ${{ inputs.openwrt != '' }}
+      shell: bash
+      run: |
+        sudo gem install fpm
+        cp .fpm_openwrt .fpm
+        fpm -t deb \
+          -v "$PKG_VERSION" \
+          -p "dist/openwrt.deb" \
+          --architecture all \
+          dist/${{ inputs.binary_name }}=/usr/bin/${{ inputs.binary_name }}
+        for architecture in ${{ inputs.openwrt }}; do
+          .github/deb2ipk.sh "$architecture" "dist/openwrt.deb" "dist/${{ inputs.binary_name }}_${{ inputs.version }}_openwrt_${architecture}.ipk"
+        done
+        rm "dist/openwrt.deb"
+
+    - name: Archive binaries
+      shell: bash
+      run: |
+        cd dist
+        mkdir -p "$DIR_NAME"
+        cp ../LICENSE "$DIR_NAME"
+        if [ '${{ inputs.os }}' = 'windows' ]; then
+          cp ${{ inputs.binary_name }} "$DIR_NAME/${{ inputs.binary_name }}.exe"
+          zip -r "$DIR_NAME.zip" "$DIR_NAME"
+        else
+          cp ${{ inputs.binary_name }} "$DIR_NAME"
+          tar -czvf "$DIR_NAME.tar.gz" "$DIR_NAME"
+        fi
+        rm -r "$DIR_NAME"
+      env:
+        DIR_NAME: ${{ env.DIR_NAME }}
+
+    - name: Cleanup binary
+      shell: bash
+      run: rm dist/${{ inputs.binary_name }}

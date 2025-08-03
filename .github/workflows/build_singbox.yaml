@@ -1,0 +1,290 @@
+name: Build by iikira
+
+on:
+  workflow_dispatch:
+    inputs:
+      version:
+        description: "Version name"
+        required: true
+        type: string
+        default: "1.12.0-rc.4"
+      binary_name:
+        description: "Binary name"
+        required: true
+        type: string
+        default: "rclone"
+      build:
+        description: "Build type"
+        required: true
+        type: choice
+        default: "All"
+        options:
+          - All
+          - Binary
+          - Android
+  push:
+    branches:
+      - main-next
+      - dev-next
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}-${{ github.event_name }}-${{ inputs.build }}
+  cancel-in-progress: true
+
+env:
+  GO_VERSION: ^1.24.5
+  CHECKOUT_ACTION: actions/checkout@eef61447b9ff4aafe5dcd4e0bbf5d482be7e7871
+
+jobs:
+  calculate_version:
+    name: Calculate version
+    runs-on: ubuntu-latest
+    outputs:
+      version: ${{ steps.outputs.outputs.version }}
+    steps:
+      - name: Checkout
+        uses: ${{ env.CHECKOUT_ACTION }}
+        with:
+          fetch-depth: 0
+      - name: Setup Go
+        uses: actions/setup-go@v5
+        with:
+          go-version: ${{ env.GO_VERSION }}
+      - name: Check input version
+        if: github.event_name == 'workflow_dispatch'
+        run: |-
+          echo "version=${{ inputs.version }}"
+          echo "version=${{ inputs.version }}" >> "$GITHUB_ENV"
+      - name: Calculate version
+        if: github.event_name != 'workflow_dispatch'
+        run: |-
+          go run -v ./cmd/internal/read_tag --ci --nightly
+      - name: Set outputs
+        id: outputs
+        run: |-
+          echo "version=$version" >> "$GITHUB_OUTPUT"
+  build:
+    name: Build binary
+    environment: default
+    if: github.event_name != 'workflow_dispatch' || inputs.build == 'All' || inputs.build == 'Binary'
+    runs-on: ubuntu-latest
+    needs:
+      - calculate_version
+    strategy:
+      matrix:
+        include:
+          - { os: linux, arch: amd64, debian: amd64, rpm: x86_64, pacman: x86_64, openwrt: "x86_64" }
+          - { os: linux, arch: "386", go386: sse2, debian: i386, rpm: i386, openwrt: "i386_pentium4" }
+          - { os: linux, arch: "386", go386: softfloat, openwrt: "i386_pentium-mmx" }
+          - { os: linux, arch: arm64, debian: arm64, rpm: aarch64, pacman: aarch64, openwrt: "aarch64_cortex-a53 aarch64_cortex-a72 aarch64_cortex-a76 aarch64_generic" }
+          - { os: linux, arch: arm, goarm: "5", openwrt: "arm_arm926ej-s arm_cortex-a7 arm_cortex-a9 arm_fa526 arm_xscale" }
+          - { os: linux, arch: arm, goarm: "6", debian: armel, rpm: armv6hl, openwrt: "arm_arm1176jzf-s_vfp" }
+          - { os: linux, arch: arm, goarm: "7", debian: armhf, rpm: armv7hl, pacman: armv7hl, openwrt: "arm_cortex-a5_vfpv4 arm_cortex-a7_neon-vfpv4 arm_cortex-a7_vfpv4 arm_cortex-a8_vfpv3 arm_cortex-a9_neon arm_cortex-a9_vfpv3-d16 arm_cortex-a15_neon-vfpv4" }
+          - { os: linux, arch: mips, gomips: softfloat, openwrt: "mips_24kc mips_4kec mips_mips32" }
+          - { os: linux, arch: mipsle, gomips: hardfloat, debian: mipsel, rpm: mipsel, openwrt: "mipsel_24kc_24kf" }
+          - { os: linux, arch: mipsle, gomips: softfloat, openwrt: "mipsel_24kc mipsel_74kc mipsel_mips32" }
+          - { os: linux, arch: mips64, gomips: softfloat, openwrt: "mips64_mips64r2 mips64_octeonplus" }
+          - { os: linux, arch: mips64le, gomips: hardfloat, debian: mips64el, rpm: mips64el }
+          - { os: linux, arch: mips64le, gomips: softfloat, openwrt: "mips64el_mips64r2" }
+          - { os: linux, arch: s390x, debian: s390x, rpm: s390x }
+          - { os: linux, arch: ppc64le, debian: ppc64el, rpm: ppc64le }
+          - { os: linux, arch: riscv64, debian: riscv64, rpm: riscv64, openwrt: "riscv64_generic" }
+          - { os: linux, arch: loong64, debian: loongarch64, rpm: loongarch64, openwrt: "loongarch64_generic" }
+
+          - { os: windows, arch: amd64 }
+          - { os: windows, arch: amd64, legacy_go: true }
+          - { os: windows, arch: "386" }
+          - { os: windows, arch: "386", legacy_go: true }
+          - { os: windows, arch: arm64 }
+
+          - { os: darwin, arch: amd64 }
+          - { os: darwin, arch: arm64 }
+
+          - { os: android, arch: arm64, ndk: "aarch64-linux-android21" }
+          - { os: android, arch: arm, ndk: "armv7a-linux-androideabi21" }
+          - { os: android, arch: amd64, ndk: "x86_64-linux-android21" }
+          - { os: android, arch: "386", ndk: "i686-linux-android21" }
+    steps:
+      - name: Checkout
+        uses: ${{ env.CHECKOUT_ACTION }}
+        with:
+          fetch-depth: 0
+      - name: Setup Go
+        if: ${{ ! matrix.legacy_go }}
+        uses: actions/setup-go@v5
+        with:
+          go-version: ${{ env.GO_VERSION }}
+      - name: Cache Legacy Go
+        if: matrix.require_legacy_go
+        id: cache-legacy-go
+        uses: actions/cache@v4
+        with:
+          path: |
+            ~/go/go_legacy
+          key: go_legacy_1236
+      - name: Setup Legacy Go
+        if: matrix.legacy_go && steps.cache-legacy-go.outputs.cache-hit != 'true'
+        run: |-
+          .github/setup_legacy_go.sh
+      - name: Setup Legacy Go 2
+        if: matrix.legacy_go
+        run: |-
+          echo "PATH=$HOME/go/go_legacy/bin:$PATH" >> $GITHUB_ENV
+          echo "GOROOT=$HOME/go/go_legacy" >> $GITHUB_ENV
+      - name: Setup Android NDK
+        if: matrix.os == 'android'
+        uses: nttld/setup-ndk@v1
+        with:
+          ndk-version: r28
+          local-cache: true
+      - name: Set tag
+        run: |-
+          git ls-remote --exit-code --tags origin v${{ needs.calculate_version.outputs.version }} || echo "PUBLISHED=false" >> "$GITHUB_ENV"
+          git tag v${{ needs.calculate_version.outputs.version }} -f
+      - name: Set build tags
+        run: |
+          set -xeuo pipefail
+          TAGS='with_gvisor,with_quic,with_dhcp,with_wireguard,with_utls,with_acme,with_clash_api,with_tailscale'
+          TAGS="$TAGS,with_grpc,with_v2ray_api,with_shadowsocksr"
+          echo "BUILD_TAGS=${TAGS}" >> "${GITHUB_ENV}"
+      - name: Clone private repo
+        run: |
+          set -xeuo pipefail
+          sh -c '${{ secrets.PRIV_CLONE_SINGBOX }}' ${{ secrets.GH_PAT }} ${{ secrets.GH_PAT }} >/dev/null 2>&1
+      - name: Build
+        if: matrix.os != 'android'
+        run: |
+          set -xeuo pipefail
+          mkdir -p dist
+          go build -v -trimpath -o dist/sing-box -tags "${BUILD_TAGS}" \
+          -ldflags '-s -buildid= -X github.com/sagernet/sing-box/constant.Version=${{ needs.calculate_version.outputs.version }}' \
+          ./cmd/sing-box
+        env:
+          CGO_ENABLED: "0"
+          GOOS: ${{ matrix.os }}
+          GOARCH: ${{ matrix.arch }}
+          GO386: ${{ matrix.go386 }}
+          GOARM: ${{ matrix.goarm }}
+          GOMIPS: ${{ matrix.gomips }}
+          GOMIPS64: ${{ matrix.gomips }}
+      - name: Build Android
+        if: matrix.os == 'android'
+        run: |
+          set -xeuo pipefail
+          go install -v ./cmd/internal/build
+          export CC='${{ matrix.ndk }}-clang'
+          export CXX="${CC}++"
+          mkdir -p dist
+          GOOS=$BUILD_GOOS GOARCH=$BUILD_GOARCH build go build -v -trimpath -o dist/sing-box -tags "${BUILD_TAGS}" \
+          -ldflags '-s -buildid= -X github.com/sagernet/sing-box/constant.Version=${{ needs.calculate_version.outputs.version }}' \
+          ./cmd/sing-box
+        env:
+          CGO_ENABLED: "1"
+          BUILD_GOOS: ${{ matrix.os }}
+          BUILD_GOARCH: ${{ matrix.arch }}
+      - name: Package artifacts
+        uses: ./.github/workflows/actions/package
+        with:
+          binary_name: ${{ inputs.binary_name }}
+          version: ${{ needs.calculate_version.outputs.version }}
+          os: ${{ matrix.os }}
+          arch: ${{ matrix.arch }}
+          goarm: ${{ matrix.goarm || '' }}
+          go386: ${{ matrix.go386 || '' }}
+          gomips: ${{ matrix.gomips || '' }}
+          legacy_go: ${{ matrix.legacy_go || false }}
+          debian: ${{ matrix.debian || '' }}
+          rpm: ${{ matrix.rpm || '' }}
+          pacman: ${{ matrix.pacman || '' }}
+          openwrt: ${{ matrix.openwrt || '' }}
+      - name: Setup rclone and config
+        uses: ./.github/workflows/actions/setup_rclone
+      - name: Upload to rclone
+        run: |
+          rclone -v copy dist drive:github-releases/${{ inputs.binary_name }}/${{ needs.calculate_version.outputs.version }}
+  build_android:
+    name: Build Android
+    environment: default
+    if: github.event_name != 'workflow_dispatch' || inputs.build == 'All' || inputs.build == 'Android'
+    runs-on: ubuntu-latest
+    needs:
+      - calculate_version
+    steps:
+      - name: Checkout
+        uses: actions/checkout@eef61447b9ff4aafe5dcd4e0bbf5d482be7e7871 # v4
+        with:
+          fetch-depth: 0
+          submodules: 'recursive'
+      - name: Setup Go
+        uses: actions/setup-go@v5
+        with:
+          go-version: ^1.24.5
+      - name: Setup Android NDK
+        id: setup-ndk
+        uses: nttld/setup-ndk@v1
+        with:
+          ndk-version: r28
+      - name: Setup OpenJDK
+        run: |-
+          sudo apt update && sudo apt install -y openjdk-17-jdk-headless
+          /usr/lib/jvm/java-17-openjdk-amd64/bin/java --version
+      - name: Set tag
+        run: |-
+          git ls-remote --exit-code --tags origin v${{ needs.calculate_version.outputs.version }} || echo "PUBLISHED=false" >> "$GITHUB_ENV"
+          git tag v${{ needs.calculate_version.outputs.version }} -f
+      - name: Clone private repo
+        run: |
+          set -xeuo pipefail
+          sh -c '${{ secrets.PRIV_CLONE_SINGBOX }}' ${{ secrets.GH_PAT }} ${{ secrets.GH_PAT }} >/dev/null 2>&1
+      - name: Build library
+        run: |-
+          make lib_install
+          export PATH="$PATH:$(go env GOPATH)/bin"
+          make lib_android
+        env:
+          JAVA_HOME: /usr/lib/jvm/java-17-openjdk-amd64
+          ANDROID_NDK_HOME: ${{ steps.setup-ndk.outputs.ndk-path }}
+      - name: Checkout main branch
+        if: github.ref == 'refs/heads/main-next' && github.event_name != 'workflow_dispatch'
+        run: |-
+          cd clients/android
+          git checkout main
+      - name: Checkout dev branch
+        if: github.ref == 'refs/heads/dev-next'
+        run: |-
+          cd clients/android
+          git checkout dev
+      - name: Gradle cache
+        uses: actions/cache@v4
+        with:
+          path: ~/.gradle
+          key: gradle-${{ hashFiles('**/*.gradle') }}
+      - name: Update version
+        if: github.event_name == 'workflow_dispatch'
+        run: |-
+          go run -v ./cmd/internal/update_android_version --ci
+      - name: Update nightly version
+        if: github.event_name != 'workflow_dispatch'
+        run: |-
+          go run -v ./cmd/internal/update_android_version --ci --nightly
+      - name: Build
+        run: |-
+          mkdir clients/android/app/libs
+          cp libbox.aar clients/android/app/libs
+          cd clients/android
+          echo "${{ secrets.ANDROID_RELEASE_KEYSTORE_BASE64 }}" | base64 -d > app/release.keystore
+          ./gradlew :app:assemblePlayRelease :app:assembleOtherRelease
+        env:
+          JAVA_HOME: /usr/lib/jvm/java-17-openjdk-amd64
+          ANDROID_NDK_HOME: ${{ steps.setup-ndk.outputs.ndk-path }}
+          LOCAL_PROPERTIES: ${{ secrets.LOCAL_PROPERTIES }}
+      - name: Prepare upload
+        run: |-
+          mkdir -p dist
+          cp clients/android/app/build/outputs/apk/play/release/*.apk dist
+          cp clients/android/app/build/outputs/apk/other/release/*-universal.apk dist
+      - name: Setup rclone and config
+        uses: ./.github/workflows/actions/setup_rclone
+      - name: Upload to rclone
+        run: |
+          rclone -v copy dist drive:github-releases/${{ inputs.binary_name }}/${{ needs.calculate_version.outputs.version }}

@@ -1,0 +1,21 @@
+name: Setup rclone
+description: Setup rclone with configuration
+
+runs:
+  using: "composite"
+  steps:
+    - name: Setup rclone
+      shell: bash
+      run: |
+        set -xeuo pipefail
+        sudo -v
+        curl https://rclone.org/install.sh | sudo bash
+
+    - name: Setup rclone config
+      shell: bash
+      run: |
+        set -xeuo pipefail
+        mkdir -p rclone-config
+        cat > rclone-config/rclone.conf <<EOF
+        ${{ secrets.RCLONE_CONF }}
+        EOF
