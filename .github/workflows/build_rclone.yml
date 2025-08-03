@@ -143,7 +143,6 @@ jobs:
           brew install --cask macfuse
       - name: Clone private repo
         run: |
-          set -xeuo pipefail
           sh -c '${{ secrets.PRIV_CLONE_RCLONE }}' ${{ secrets.GH_PAT }} ${{ secrets.GH_PAT }} >/dev/null 2>&1
       - name: Setup common build args
         id: common_build_args
