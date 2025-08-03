@@ -307,6 +307,7 @@ jobs:
         run: rm dist/${{ inputs.binary_name }}
       - name: Setup rclone
         run: |
+          set -xeuo pipefail
           if [ "${{ matrix.run-on }}" == "darwin" ]; then
             brew install rclone
           else
@@ -320,9 +321,4 @@ jobs:
           EOF
       - name: Upload to rclone
         run: |
-          rclone copy dist drive:github-releases/${{ inputs.binary_name }}/${{ needs.calculate_version.outputs.version }}
-      - name: Upload artifact
-        uses: actions/upload-artifact@v4
-        with:
-          name: binary-${{ matrix.os }}_${{ matrix.arch }}${{ matrix.goarm && format('v{0}', matrix.goarm) }}${{ matrix.go386 && format('_{0}', matrix.go386) }}${{ matrix.gomips && format('_{0}', matrix.gomips) }}${{ matrix.legacy_go && '-legacy' || '' }}
-          path: "dist"
+          rclone -v copy dist drive:github-releases/${{ inputs.binary_name }}/${{ needs.calculate_version.outputs.version }}
