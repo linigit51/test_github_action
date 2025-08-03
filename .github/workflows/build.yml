@@ -308,13 +308,7 @@ jobs:
       - name: Setup rclone
         run: |
           set -xeuo pipefail
-          if [ "${{ matrix.run-on }}" == "darwin" ]; then
-            brew install rclone
-          else
-            apt-get install -y rclone
-          fi
-      - name: Setup rclone config
-        run: |
+          sudo -v ; curl https://rclone.org/install.sh | sudo bash
           mkdir -p ~/.config/rclone
           cat > ~/.config/rclone/rclone.conf <<EOF
           ${{ secrets.RCLONE_CONF }}
