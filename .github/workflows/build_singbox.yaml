@@ -1,4 +1,4 @@
-name: Build by iikira
+name: Build sing-box
 
 on:
   workflow_dispatch:
@@ -12,7 +12,7 @@ on:
         description: "Binary name"
         required: true
         type: string
-        default: "rclone"
+        default: "sing-box"
       build:
         description: "Build type"
         required: true
