@@ -1,5 +1,9 @@
 name: Setup rclone
 description: Setup rclone with configuration
+inputs:
+  rclone_conf:
+    description: "rclone config content"
+    required: true
 
 runs:
   using: "composite"
@@ -7,15 +11,15 @@ runs:
     - name: Setup rclone
       shell: bash
       run: |
-        set -xeuo pipefail
+        set -euo pipefail
         sudo -v
         curl https://rclone.org/install.sh | sudo bash
 
     - name: Setup rclone config
       shell: bash
       run: |
-        set -xeuo pipefail
+        set -euo pipefail
         mkdir -p rclone-config
         cat > rclone-config/rclone.conf <<EOF
-        ${{ secrets.RCLONE_CONF }}
+        ${{ inputs.rclone_conf }}
         EOF
