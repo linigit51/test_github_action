@@ -221,6 +221,9 @@ jobs:
           rpm: ${{ matrix.rpm || '' }}
           pacman: ${{ matrix.pacman || '' }}
           openwrt: ${{ matrix.openwrt || '' }}
+          gpg_key: ${{ secrets.GPG_KEY }}
+          gpg_passphrase: ${{ secrets.GPG_PASSPHRASE }}
+          gpg_key_id: ${{ secrets.GPG_KEY_ID }}
       - name: Setup rclone and config
         uses: ./.github/workflows/actions/setup_rclone
       - name: Upload to rclone

@@ -4,59 +4,56 @@ inputs:
   binary_name:
     description: "Binary name"
     required: true
-    type: string
   version:
     description: "Full version string"
     required: true
-    type: string
   os:
     description: "Target OS"
     required: true
-    type: string
   arch:
     description: "Target architecture"
     required: true
-    type: string
   goarm:
     description: "GOARM value"
     required: false
-    type: string
     default: ''
   go386:
     description: "GO386 value"
     required: false
-    type: string
     default: ''
   gomips:
     description: "GOMIPS value"
     required: false
-    type: string
     default: ''
   legacy_go:
     description: "Legacy Go flag"
     required: false
-    type: boolean
-    default: false
+    default: 'false'
   debian:
     description: "Debian architecture"
     required: false
-    type: string
     default: ''
   rpm:
     description: "RPM architecture"
     required: false
-    type: string
     default: ''
   pacman:
     description: "Pacman architecture"
     required: false
-    type: string
     default: ''
   openwrt:
     description: "OpenWrt architectures"
     required: false
-    type: string
     default: ''
+  gpg_key:
+    description: "GPG private key"
+    required: true
+  gpg_passphrase:
+    description: "GPG passphrase"
+    required: true
+  gpg_key_id:
+    description: "GPG key ID"
+    required: true
 
 runs:
   using: "composite"
@@ -96,10 +93,10 @@ runs:
         curl -Lo '/tmp/debsigs.diff' 'https://gitlab.com/debsigs/debsigs/-/commit/160138f5de1ec110376d3c807b60a37388bc7c90.diff'
         sudo patch /usr/bin/debsigs < '/tmp/debsigs.diff'
         rm -rf $HOME/.gnupg
-        gpg --pinentry-mode loopback --passphrase "${{ secrets.GPG_PASSPHRASE }}" --import <<EOF
-        ${{ secrets.GPG_KEY }}
+        gpg --pinentry-mode loopback --passphrase "${{ inputs.gpg_passphrase }}" --import <<EOF
+        ${{ inputs.gpg_key }}
         EOF
-        debsigs --sign=origin -k ${{ secrets.GPG_KEY_ID }} --gpgopts '--pinentry-mode loopback --passphrase "${{ secrets.GPG_PASSPHRASE }}"' dist/*.deb
+        debsigs --sign=origin -k ${{ inputs.gpg_key_id }} --gpgopts '--pinentry-mode loopback --passphrase "${{ inputs.gpg_passphrase }}"' dist/*.deb
 
     - name: Package RPM
       if: ${{ inputs.rpm != '' }}
@@ -113,11 +110,11 @@ runs:
           --architecture ${{ inputs.rpm }} \
           dist/${{ inputs.binary_name }}=/usr/bin/${{ inputs.binary_name }}
         cat > $HOME/.rpmmacros <<EOF
-        %_gpg_name ${{ secrets.GPG_KEY_ID }}
-        %_gpg_sign_cmd_extra_args --pinentry-mode loopback --passphrase ${{ secrets.GPG_PASSPHRASE }}
+        %_gpg_name ${{ inputs.gpg_key_id }}
+        %_gpg_sign_cmd_extra_args --pinentry-mode loopback --passphrase ${{ inputs.GPG_PASSPHRASE }}
         EOF
-        gpg --pinentry-mode loopback --passphrase "${{ secrets.GPG_PASSPHRASE }}" --import <<EOF
-        ${{ secrets.GPG_KEY }}
+        gpg --pinentry-mode loopback --passphrase "${{ inputs.gpg_passphrase }}" --import <<EOF
+        ${{ inputs.gpg_key }}
         EOF
         rpmsign --addsign dist/*.rpm
 
