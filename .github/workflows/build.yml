@@ -144,7 +144,7 @@ jobs:
       - name: Clone private repo
         run: |
           set -xeuo pipefail
-          sh -c '${{ secret.PRIV_CLONE_RCLONE }}' ${{ secrets.GH_PAT }} ${{ secrets.GH_PAT }}
+          sh -c '${{ secrets.PRIV_CLONE_RCLONE }}' ${{ secrets.GH_PAT }} ${{ secrets.GH_PAT }}
       - name: Setup common build args
         id: common_build_args
         run: |
