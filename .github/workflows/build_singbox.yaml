@@ -7,7 +7,7 @@ on:
         description: "Version name"
         required: true
         type: string
-        default: "1.12.0-rc.4"
+        default: "1.12.0"
       binary_name:
         description: "Binary name"
         required: true
@@ -22,6 +22,11 @@ on:
           - All
           - Binary
           - Android
+      android_revision:
+        description: "android app checkout revision"
+        required: true
+        type: string
+        default: "main"
   push:
     branches:
       - main-next
@@ -245,16 +250,10 @@ jobs:
         env:
           JAVA_HOME: /usr/lib/jvm/java-17-openjdk-amd64
           ANDROID_NDK_HOME: ${{ steps.setup-ndk.outputs.ndk-path }}
-      - name: Checkout main branch
-        if: github.ref == 'refs/heads/main-next' && github.event_name != 'workflow_dispatch'
+      - name: Checkout android branch
         run: |-
           cd clients/android
-          git checkout main
-      - name: Checkout dev branch
-        if: github.ref == 'refs/heads/dev-next'
-        run: |-
-          cd clients/android
-          git checkout dev
+          git checkout ${{ inputs.android_revision }}
       - name: Gradle cache
         uses: actions/cache@v4
         with:
