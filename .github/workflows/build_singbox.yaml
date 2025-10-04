@@ -32,7 +32,7 @@ on:
         description: "apple app checkout revision"
         required: true
         type: string
-        default: "main"
+        default: "c5734677bdfcba5d2d4faf10c4f10475077a82ab"
   push:
     branches:
       - main-next
@@ -327,14 +327,11 @@ jobs:
       - name: Build library
         run: |-
           set -xeuo pipefail
-          go install -v github.com/sagernet/gomobile/cmd/gomobile
-          go install -v github.com/sagernet/gomobile/cmd/gobind
           make lib_install
           export PATH="$PATH:$(go env GOPATH)/bin"
           go run ./cmd/internal/build_libbox -target apple -platform macos
           mv Libbox.xcframework clients/apple
       - name: Update version
-        if: matrix.if && matrix.name != 'iOS'
         run: |-
           go run -v ./cmd/internal/update_apple_version --ci
       - name: Build macOS app without Signing
@@ -359,13 +356,7 @@ jobs:
           <plist version="1.0">
           <dict>
               <key>method</key>
-              <string>development</string>
-              <key>signingStyle</key>
-              <string>manual</string>
-              <key>teamID</key>
-              <string></string>
-              <key>signingCertificate</key>
-              <string></string>
+              <string>mac-application</string>
           </dict>
           </plist>
           EOF
