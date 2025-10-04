@@ -320,16 +320,17 @@ jobs:
           git ls-remote --exit-code --tags origin v${{ needs.calculate_version.outputs.version }} || echo "PUBLISHED=false" >> "$GITHUB_ENV"
           git tag v${{ needs.calculate_version.outputs.version }} -f
           echo "VERSION=${{ needs.calculate_version.outputs.version }}" >> "$GITHUB_ENV"
-      - name: Build library
-        run: |-
-          make lib_install
-          export PATH="$PATH:$(go env GOPATH)/bin"
-          go run ./cmd/internal/build_libbox -target apple -platform macos
-          mv Libbox.xcframework clients/apple
       - name: Checkout apple branch
         run: |-
           cd clients/apple
           git checkout ${{ inputs.apple_revision }}
+      - name: Build library
+        run: |-
+          set -xeuo pipefail
+          make lib_install
+          export PATH="$PATH:$(go env GOPATH)/bin"
+          go run ./cmd/internal/build_libbox -target apple -platform macos
+          mv Libbox.xcframework clients/apple
       - name: Update version
         if: matrix.if && matrix.name != 'iOS'
         run: |-
