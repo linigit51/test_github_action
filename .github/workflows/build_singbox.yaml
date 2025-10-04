@@ -323,6 +323,10 @@ jobs:
           export PATH="$PATH:$(go env GOPATH)/bin"
           go run ./cmd/internal/build_libbox -target apple -platform macos
           mv Libbox.xcframework clients/apple
+      - name: Checkout apple branch
+        run: |-
+          cd clients/apple
+          git checkout ${{ inputs.apple_revision }}
       - name: Update version
         if: matrix.if && matrix.name != 'iOS'
         run: |-
