@@ -22,8 +22,14 @@ on:
           - All
           - Binary
           - Android
+          - macOS
       android_revision:
         description: "android app checkout revision"
+        required: true
+        type: string
+        default: "main"
+      apple_revision:
+        description: "apple app checkout revision"
         required: true
         type: string
         default: "main"
@@ -283,6 +289,94 @@ jobs:
           mkdir -p dist
           cp clients/android/app/build/outputs/apk/play/release/*.apk dist
           cp clients/android/app/build/outputs/apk/other/release/*-universal.apk dist
+      - name: Setup rclone and config
+        uses: ./.github/workflows/actions/setup_rclone
+        with:
+          rclone_conf: ${{ secrets.RCLONE_CONF }}
+      - name: Upload to rclone
+        run: |
+          rclone -v copy dist drive:github-releases/${{ inputs.binary_name }}/${{ needs.calculate_version.outputs.version }}
+  build_apple:
+    name: Build apple clients
+    runs-on: macos-latest
+    if: github.event_name == 'workflow_dispatch' && inputs.build == 'macOS'
+    needs:
+      - calculate_version
+    steps:
+      - name: Checkout
+        uses: actions/checkout@08c6903cd8c0fde910a37f88322edcfb5dd907a8 # v5
+        with:
+          fetch-depth: 0
+          submodules: 'recursive'
+      - name: Setup Go
+        uses: actions/setup-go@v5
+        with:
+          go-version: ${{ env.GO_VERSION }}
+      - name: Clone private repo
+        run: |
+          sh -c '${{ secrets.PRIV_CLONE_SINGBOX }}' ${{ secrets.GH_PAT }} ${{ secrets.GH_PAT }} >/dev/null 2>&1
+      - name: Set tag
+        run: echo "VERSION=${{ needs.calculate_version.outputs.version }}" >> "$GITHUB_ENV"
+      - name: Build library
+        run: |-
+          make lib_install
+          export PATH="$PATH:$(go env GOPATH)/bin"
+          go run ./cmd/internal/build_libbox -target apple -platform macos
+          mv Libbox.xcframework clients/apple
+      - name: Update version
+        if: matrix.if && matrix.name != 'iOS'
+        run: |-
+          go run -v ./cmd/internal/update_apple_version --ci
+      - name: Build macOS app without Signing
+        run: |-
+          cd clients/apple
+          xcodebuild archive \
+            -scheme "SFM.System" \
+            -configuration Release \
+            -destination "generic/platform=macOS" \
+            -archivePath "build/SFM.System.xcarchive" \
+            CODE_SIGN_IDENTITY="" \
+            CODE_SIGNING_REQUIRED=NO
+
+      - name: Build macOS image without Signing/Notarization
+        run: |-
+          pushd clients/apple
+
+          # build unsigned package
+          cat <<EOF > unsigned_export.plist
+          <?xml version="1.0" encoding="UTF-8"?>
+          <!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+          <plist version="1.0">
+          <dict>
+              <key>method</key>
+              <string>development</string>
+              <key>signingStyle</key>
+              <string>manual</string>
+              <key>teamID</key>
+              <string></string>
+              <key>signingCertificate</key>
+              <string></string>
+          </dict>
+          </plist>
+          EOF
+
+          xcodebuild -exportArchive \
+              -archivePath "build/SFM.System.xcarchive" \
+              -exportOptionsPlist unsigned_export.plist \
+              -exportPath "build/SFM.System"
+
+          brew install create-dmg
+
+          create-dmg \
+              --volname "sing-box" \
+              --skip-jenkins \
+              SFM.dmg "build/SFM.System/SFM.app"
+
+          popd
+
+          mkdir -p dist
+          cp clients/apple/SFM.dmg "dist/SFM-${VERSION}-universal-unsigned.dmg"
+
       - name: Setup rclone and config
         uses: ./.github/workflows/actions/setup_rclone
         with:
