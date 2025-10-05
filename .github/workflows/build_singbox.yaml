@@ -232,7 +232,7 @@ jobs:
       - name: Setup Go
         uses: actions/setup-go@v5
         with:
-          go-version: ^1.24.5
+          go-version: ${{ inputs.go_version }}
       - name: Setup Android NDK
         id: setup-ndk
         uses: nttld/setup-ndk@v1
