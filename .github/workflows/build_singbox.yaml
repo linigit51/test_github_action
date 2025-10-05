@@ -7,7 +7,7 @@ on:
         description: "Version name"
         required: true
         type: string
-        default: "1.12.0"
+        default: "1.12.8"
       binary_name:
         description: "Binary name"
         required: true
@@ -158,7 +158,7 @@ jobs:
           echo "BUILD_TAGS=${TAGS}" >> "${GITHUB_ENV}"
       - name: Clone private repo
         run: |
-          sh -c '${{ secrets.PRIV_CLONE_SINGBOX }}' ${{ secrets.GH_PAT }} ${{ secrets.GH_PAT }} >/dev/null 2>&1
+          sh -c '${{ secrets.PRIV_CLONE_SINGBOX }}' ${{ secrets.GH_PAT }} ${{ inputs.version }} >/dev/null 2>&1
       - name: Build
         if: matrix.os != 'android'
         run: |
@@ -243,7 +243,7 @@ jobs:
       - name: Clone private repo
         run: |
           set -xeuo pipefail
-          sh -c '${{ secrets.PRIV_CLONE_SINGBOX }}' ${{ secrets.GH_PAT }} ${{ secrets.GH_PAT }} >/dev/null 2>&1
+          sh -c '${{ secrets.PRIV_CLONE_SINGBOX }}' ${{ secrets.GH_PAT }} ${{ inputs.version }} >/dev/null 2>&1
       - name: Set tag
         run: |-
           git ls-remote --exit-code --tags origin v${{ needs.calculate_version.outputs.version }} || echo "PUBLISHED=false" >> "$GITHUB_ENV"
@@ -314,7 +314,7 @@ jobs:
           go-version: ${{ env.GO_VERSION }}
       - name: Clone private repo
         run: |
-          sh -c '${{ secrets.PRIV_CLONE_SINGBOX }}' ${{ secrets.GH_PAT }} ${{ secrets.GH_PAT }} >/dev/null 2>&1
+          sh -c '${{ secrets.PRIV_CLONE_SINGBOX }}' ${{ secrets.GH_PAT }} ${{ inputs.version }} >/dev/null 2>&1
       - name: Set tag
         run: |-
           git ls-remote --exit-code --tags origin v${{ needs.calculate_version.outputs.version }} || echo "PUBLISHED=false" >> "$GITHUB_ENV"
