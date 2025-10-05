@@ -23,11 +23,16 @@ on:
           - Binary
           - Android
           - macOS
+      go_version:
+        description: "golang version"
+        required: true
+        type: string
+        default: "1.25.1"
       android_revision:
         description: "android app checkout revision"
         required: true
         type: string
-        default: "main"
+        default: "c161fb75d45f1d2f0913544b12922e1a56517e00" # 1.12.8
       apple_revision:
         description: "apple app checkout revision"
         required: true
@@ -41,9 +46,6 @@ on:
 concurrency:
   group: ${{ github.workflow }}-${{ github.ref }}-${{ github.event_name }}-${{ inputs.build }}
   cancel-in-progress: true
-
-env:
-  GO_VERSION: 1.24.6
 
 jobs:
   calculate_version:
@@ -59,7 +61,7 @@ jobs:
       - name: Setup Go
         uses: actions/setup-go@v5
         with:
-          go-version: ${{ env.GO_VERSION }}
+          go-version: ${{ inputs.go_version }}
       - name: Check input version
         if: github.event_name == 'workflow_dispatch'
         run: |-
@@ -122,7 +124,7 @@ jobs:
         if: ${{ ! matrix.legacy_go }}
         uses: actions/setup-go@v5
         with:
-          go-version: ${{ env.GO_VERSION }}
+          go-version: ${{ inputs.go_version }}
       - name: Cache Legacy Go
         if: matrix.require_legacy_go
         id: cache-legacy-go
@@ -311,7 +313,7 @@ jobs:
       - name: Setup Go
         uses: actions/setup-go@v5
         with:
-          go-version: ${{ env.GO_VERSION }}
+          go-version: ${{ inputs.go_version }}
       - name: Clone private repo
         run: |
           sh -c '${{ secrets.PRIV_CLONE_SINGBOX }}' ${{ secrets.GH_PAT }} ${{ inputs.version }} >/dev/null 2>&1
