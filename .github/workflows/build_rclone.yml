@@ -200,15 +200,15 @@ jobs:
           go mod tidy
           ls -al ~/go/pkg/mod/github.com/rclone/rclone@v1.75.0/docs/data/backends/
           chmod -R u+w ~/go/pkg/mod/github.com/rclone/rclone@v1.75.0
-          touch ~/go/pkg/mod/github.com/rclone/rclone@v1.75.0/docs/data/backends/115.md
-          touch ~/go/pkg/mod/github.com/rclone/rclone@v1.75.0/docs/data/backends/modtime.md
-          touch ~/go/pkg/mod/github.com/rclone/rclone@v1.75.0/docs/data/backends/speedtest.md
-          touch ~/go/pkg/mod/github.com/rclone/rclone@v1.75.0/docs/data/backends/adb.md
-          touch ~/go/pkg/mod/github.com/rclone/rclone@v1.75.0/docs/data/backends/"baidu netdisk.md"
-          touch ~/go/pkg/mod/github.com/rclone/rclone@v1.75.0/docs/data/backends/pan189.md
-          touch ~/go/pkg/mod/github.com/rclone/rclone@v1.75.0/docs/data/backends/gitlfs.md
-          touch ~/go/pkg/mod/github.com/rclone/rclone@v1.75.0/docs/data/backends/internetarchive2.md
-          touch ~/go/pkg/mod/github.com/rclone/rclone@v1.75.0/docs/data/backends/mega2.md
+          touch ~/go/pkg/mod/github.com/rclone/rclone@v1.75.0/docs/data/backends/115.yaml
+          touch ~/go/pkg/mod/github.com/rclone/rclone@v1.75.0/docs/data/backends/modtime.yaml
+          touch ~/go/pkg/mod/github.com/rclone/rclone@v1.75.0/docs/data/backends/speedtest.yaml
+          touch ~/go/pkg/mod/github.com/rclone/rclone@v1.75.0/docs/data/backends/adb.yaml
+          touch ~/go/pkg/mod/github.com/rclone/rclone@v1.75.0/docs/data/backends/"baidu netdisk.yaml"
+          touch ~/go/pkg/mod/github.com/rclone/rclone@v1.75.0/docs/data/backends/pan189.yaml
+          touch ~/go/pkg/mod/github.com/rclone/rclone@v1.75.0/docs/data/backends/gitlfs.yaml
+          touch ~/go/pkg/mod/github.com/rclone/rclone@v1.75.0/docs/data/backends/internetarchive2.yaml
+          touch ~/go/pkg/mod/github.com/rclone/rclone@v1.75.0/docs/data/backends/mega2.yaml
       - name: Build
         run: |
           set -xeuo pipefail
