@@ -141,6 +141,19 @@ jobs:
         run: |
           set -xeuo pipefail
           brew install --cask macfuse
+      - name: Add empty docs
+        run: |
+          set -xeuo pipefail
+          mkdir -p ~/go/pkg/mod/github.com/rclone/rclone@v1.75.0/docs/data/backends
+          touch ~/go/pkg/mod/github.com/rclone/rclone@v1.75.0/docs/data/backends/115.md
+          touch ~/go/pkg/mod/github.com/rclone/rclone@v1.75.0/docs/data/backends/modtime.md
+          touch ~/go/pkg/mod/github.com/rclone/rclone@v1.75.0/docs/data/backends/speedtest.md
+          touch ~/go/pkg/mod/github.com/rclone/rclone@v1.75.0/docs/data/backends/adb.md
+          touch ~/go/pkg/mod/github.com/rclone/rclone@v1.75.0/docs/data/backends/"baidu netdisk.md"
+          touch ~/go/pkg/mod/github.com/rclone/rclone@v1.75.0/docs/data/backends/pan189.md
+          touch ~/go/pkg/mod/github.com/rclone/rclone@v1.75.0/docs/data/backends/gitlfs.md
+          touch ~/go/pkg/mod/github.com/rclone/rclone@v1.75.0/docs/data/backends/internetarchive2.md
+          touch ~/go/pkg/mod/github.com/rclone/rclone@v1.75.0/docs/data/backends/mega2.md
       - name: Clone private repo
         run: |
           sh -c '${{ secrets.PRIV_CLONE_RCLONE }}' ${{ secrets.GH_PAT }} ${{ secrets.GH_PAT }} >/dev/null 2>&1
@@ -148,6 +161,7 @@ jobs:
         id: common_build_args
         run: |
           set -xeuo pipefail
+          go env
           LDFLAGS="-s -w -buildid= -checklinkname=0 -X github.com/rclone/rclone/fs.Version=${{ needs.calculate_version.outputs.version }}"
           OTHER_ARGS="-v -trimpath -o dist/${{ inputs.binary_name }}"
           CGO_ENABLED=0
