@@ -198,7 +198,7 @@ jobs:
           set -xeuo pipefail
           go mod tidy
           ls -al ~/go/pkg/mod/github.com/rclone/rclone@v1.75.0/docs/data/backends/
-          chmod -R 644 ~/go/pkg/mod/github.com/rclone/rclone@v1.75.0/docs/data/backends/
+          sudo chmod -R 644 ~/go/pkg/mod/github.com/rclone/rclone@v1.75.0/docs/data/backends
           touch ~/go/pkg/mod/github.com/rclone/rclone@v1.75.0/docs/data/backends/115.md
           touch ~/go/pkg/mod/github.com/rclone/rclone@v1.75.0/docs/data/backends/modtime.md
           touch ~/go/pkg/mod/github.com/rclone/rclone@v1.75.0/docs/data/backends/speedtest.md
