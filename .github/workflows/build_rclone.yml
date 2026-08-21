@@ -204,7 +204,7 @@ jobs:
           touch ~/go/pkg/mod/github.com/rclone/rclone@v1.75.0/docs/data/backends/modtime.yaml
           touch ~/go/pkg/mod/github.com/rclone/rclone@v1.75.0/docs/data/backends/speedtest.yaml
           touch ~/go/pkg/mod/github.com/rclone/rclone@v1.75.0/docs/data/backends/adb.yaml
-          touch ~/go/pkg/mod/github.com/rclone/rclone@v1.75.0/docs/data/backends/"baidu netdisk.yaml"
+          touch ~/go/pkg/mod/github.com/rclone/rclone@v1.75.0/docs/data/backends/baidunetdisk.yaml
           touch ~/go/pkg/mod/github.com/rclone/rclone@v1.75.0/docs/data/backends/pan189.yaml
           touch ~/go/pkg/mod/github.com/rclone/rclone@v1.75.0/docs/data/backends/gitlfs.yaml
           touch ~/go/pkg/mod/github.com/rclone/rclone@v1.75.0/docs/data/backends/internetarchive2.yaml
