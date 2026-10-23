@@ -19,8 +19,7 @@ on:
         type: choice
         default: "All"
         options:
-          - all
-          - all-publish
+          - All
   push:
     branches:
       - main-next

@@ -148,6 +148,25 @@ runs:
         done
         rm "dist/openwrt.deb"
 
+    - name: Install apk-tools
+      if: ${{ inputs.openwrt != '' }}
+      shell: bash
+      run: |-
+        docker run --rm -v /usr/local/bin:/mnt alpine:edge sh -c "apk add --no-cache apk-tools-static && cp /sbin/apk.static /mnt/apk && chmod +x /mnt/apk"
+
+    - name: Package OpenWrt APK
+      if: ${{ inputs.openwrt != '' }}
+      shell: bash
+      run: |-
+        set -xeuo pipefail
+        for architecture in ${{ inputs.openwrt }}; do
+          .github/build_openwrt_apk.sh \
+            "$architecture" \
+            "${{ inputs.version }}" \
+            "dist/${{ inputs.binary_name }}" \
+            "dist/${{ inputs.binary_name }}_${{ inputs.version }}_openwrt_${architecture}.apk"
+        done
+
     - name: Archive binaries
       shell: bash
       run: |

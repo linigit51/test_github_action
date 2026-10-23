@@ -7,7 +7,7 @@ on:
         description: "Version name"
         required: true
         type: string
-        default: "1.12.8"
+        default: "1.14.3"
       binary_name:
         description: "Binary name"
         required: true
@@ -27,12 +27,12 @@ on:
         description: "golang version"
         required: true
         type: string
-        default: "1.25.1"
+        default: "1.25.5"
       android_revision:
         description: "android app checkout revision"
         required: true
         type: string
-        default: "c161fb75d45f1d2f0913544b12922e1a56517e00" # 1.12.8
+        default: "ae93152f21457723af77d144f28c1f7be7362aec" # 1.14.3
       apple_revision:
         description: "apple app checkout revision"
         required: true
