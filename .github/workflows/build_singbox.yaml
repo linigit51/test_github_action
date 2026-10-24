@@ -27,12 +27,12 @@ on:
         description: "golang version"
         required: true
         type: string
-        default: "1.25.5"
+        default: "1.26.8" # sing-box 1.14.3
       android_revision:
         description: "android app checkout revision"
         required: true
         type: string
-        default: "ae93152f21457723af77d144f28c1f7be7362aec" # 1.14.3
+        default: "ae93152f21457723af77d144f28c1f7be7362aec" # sing-box 1.14.3
 
 concurrency:
   group: ${{ github.workflow }}-${{ github.ref }}-${{ github.event_name }}-${{ inputs.build }}
