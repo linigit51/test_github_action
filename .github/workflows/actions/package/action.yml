@@ -45,6 +45,10 @@ inputs:
     description: "OpenWrt architectures"
     required: false
     default: ''
+  apk_sign_key:
+    description: "APK signing private key (PEM)"
+    required: false
+    default: ''
   gpg_key:
     description: "GPG private key"
     required: true
@@ -160,12 +164,23 @@ runs:
       run: |-
         set -xeuo pipefail
         chmod +x .github/build_openwrt_apk.sh
+        SIGN_ARG=""
+        if [ -n "${{ inputs.apk_sign_key }}" ]; then
+          mkdir -p .apk-keys
+          printf '%s\n' '${{ inputs.apk_sign_key }}' > .apk-keys/sign.rsa
+          chmod 600 .apk-keys/sign.rsa
+          # Derive the matching public key from the private key; no need to
+          # store it as a separate secret.
+          openssl rsa -in .apk-keys/sign.rsa -pubout -out .apk-keys/sign.rsa.pub
+          SIGN_ARG="$PWD/.apk-keys/sign.rsa"
+        fi
         for architecture in ${{ inputs.openwrt }}; do
           .github/build_openwrt_apk.sh \
             "$architecture" \
             "${{ inputs.version }}" \
             "dist/${{ inputs.binary_name }}" \
-            "dist/${{ inputs.binary_name }}_${{ inputs.version }}_openwrt_${architecture}.apk"
+            "dist/${{ inputs.binary_name }}_${{ inputs.version }}_openwrt_${architecture}.apk" \
+            "$SIGN_ARG"
         done
 
     - name: Archive binaries

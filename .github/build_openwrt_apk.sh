@@ -19,9 +19,10 @@ ARCHITECTURE="$1"
 VERSION="$2"
 BINARY_PATH="$3"
 OUTPUT_PATH="$4"
+SIGN_KEY="${5:-}"
 
 if [ -z "$ARCHITECTURE" ] || [ -z "$VERSION" ] || [ -z "$BINARY_PATH" ] || [ -z "$OUTPUT_PATH" ]; then
-  echo "Usage: $0 <architecture> <version> <binary_path> <output_path>"
+  echo "Usage: $0 <architecture> <version> <binary_path> <output_path> [sign_key]"
   exit 1
 fi
 
@@ -65,7 +66,12 @@ mkdir -p "$PACKAGES_DIR"
   | sort > "$PACKAGES_DIR/.list"
 
 # Build APK
+SIGN_ARGS=()
+if [ -n "$SIGN_KEY" ]; then
+  SIGN_ARGS+=(--sign-key "$SIGN_KEY")
+fi
 apk --root "$APK_ROOT_DIR" mkpkg \
+  "${SIGN_ARGS[@]}" \
   --info "name:$BINARY_NAME" \
   --info "version:${APK_VERSION}" \
   --info "description:$BINARY_NAME" \
@@ -75,3 +81,9 @@ apk --root "$APK_ROOT_DIR" mkpkg \
   --info "depends:ca-bundle" \
   --files "$ROOT_DIR" \
   --output "$OUTPUT_PATH"
+
+# Verify the signature when a signing key was used
+if [ -n "$SIGN_KEY" ]; then
+  PUBKEY_DIR="$(dirname "$SIGN_KEY")"
+  apk verify --keys-dir "$PUBKEY_DIR" "$OUTPUT_PATH"
+fi
