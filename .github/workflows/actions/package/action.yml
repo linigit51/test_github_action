@@ -159,6 +159,7 @@ runs:
       shell: bash
       run: |-
         set -xeuo pipefail
+        chmod +x .github/build_openwrt_apk.sh
         for architecture in ${{ inputs.openwrt }}; do
           .github/build_openwrt_apk.sh \
             "$architecture" \
