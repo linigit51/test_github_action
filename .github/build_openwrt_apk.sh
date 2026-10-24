@@ -60,10 +60,12 @@ PACKAGES_DIR="$ROOT_DIR/lib/apk/packages"
 mkdir -p "$PACKAGES_DIR"
 
 # .list (all files, excluding lib/apk/packages/ metadata)
+# Named <binary_name>.list per OpenWrt convention so packages don't fight
+# over a single .list when multiple are installed side-by-side.
 (cd "$ROOT_DIR" && find . -type f -o -type l) \
   | sed 's|^\./|/|' \
   | grep -v '^/lib/apk/packages/' \
-  | sort > "$PACKAGES_DIR/.list"
+  | sort > "$PACKAGES_DIR/$BINARY_NAME.list"
 
 # Build APK
 SIGN_ARGS=()
