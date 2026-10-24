@@ -17,13 +17,10 @@ on:
         description: "Build type"
         required: true
         type: choice
-        default: "All"
+        default: "mainly_platform"
         options:
-          - All
-  push:
-    branches:
-      - main-next
-      - dev-next
+          - mainly_platform
+          - all
 
 concurrency:
   group: ${{ github.workflow }}-${{ github.ref }}-${{ github.event_name }}-${{ inputs.build }}
@@ -38,7 +35,20 @@ jobs:
     runs-on: ubuntu-latest
     outputs:
       version: ${{ steps.outputs.outputs.version }}
+      matrix: ${{ steps.matrix.outputs.matrix }}
     steps:
+      - name: Checkout
+        uses: actions/checkout@eef61447b9ff4aafe5dcd4e0bbf5d482be7e7871 # v4
+        with:
+          fetch-depth: 0
+      - name: Select matrix
+        id: matrix
+        run: |-
+          if [ "${{ inputs.build || 'mainly_platform' }}" = "all" ]; then
+            echo "matrix=$(cat .github/matrix/rclone_full.json | jq -c .)" >> "$GITHUB_OUTPUT"
+          else
+            echo "matrix=$(cat .github/matrix/rclone_mainly.json | jq -c .)" >> "$GITHUB_OUTPUT"
+          fi
       - name: Set outputs
         id: outputs
         run: |-
@@ -55,40 +65,14 @@ jobs:
   build:
     name: Build binary
     continue-on-error: true
-    if: github.event_name != 'workflow_dispatch' || inputs.build == 'all'
-    runs-on: ${{ matrix.run-on }} 
+    if: github.event_name != 'workflow_dispatch' || inputs.build == 'all' || inputs.build == 'mainly_platform'
+    runs-on: ${{ matrix.run-on }}
     needs:
       - calculate_version
     strategy:
       matrix:
-        include:
-          - { os: linux, arch: amd64, debian: amd64, rpm: x86_64, pacman: x86_64, openwrt: "x86_64", run-on: ubuntu-latest }
-          - { os: linux, arch: "386", go386: sse2, debian: i386, rpm: i386, openwrt: "i386_pentium4", run-on: ubuntu-latest }
-          - { os: linux, arch: "386", go386: softfloat, openwrt: "i386_pentium-mmx", run-on: ubuntu-latest }
-          - { os: linux, arch: arm64, debian: arm64, rpm: aarch64, pacman: aarch64, openwrt: "aarch64_cortex-a53 aarch64_cortex-a72 aarch64_cortex-a76 aarch64_generic", run-on: ubuntu-latest }
-          - { os: linux, arch: arm, goarm: "5", openwrt: "arm_arm926ej-s arm_cortex-a7 arm_cortex-a9 arm_fa526 arm_xscale", run-on: ubuntu-latest }
-          - { os: linux, arch: arm, goarm: "6", debian: armel, rpm: armv6hl, openwrt: "arm_arm1176jzf-s_vfp", run-on: ubuntu-latest }
-          - { os: linux, arch: arm, goarm: "7", debian: armhf, rpm: armv7hl, pacman: armv7hl, openwrt: "arm_cortex-a5_vfpv4 arm_cortex-a7_neon-vfpv4 arm_cortex-a7_vfpv4 arm_cortex-a8_vfpv3 arm_cortex-a9_neon arm_cortex-a9_vfpv3-d16 arm_cortex-a15_neon-vfpv4", run-on: ubuntu-latest }
-          - { os: linux, arch: mips, gomips: softfloat, openwrt: "mips_24kc mips_4kec mips_mips32", run-on: ubuntu-latest }
-          - { os: linux, arch: mipsle, gomips: hardfloat, debian: mipsel, rpm: mipsel, openwrt: "mipsel_24kc_24kf", run-on: ubuntu-latest }
-          - { os: linux, arch: mipsle, gomips: softfloat, openwrt: "mipsel_24kc mipsel_74kc mipsel_mips32", run-on: ubuntu-latest }
-          - { os: linux, arch: mips64, gomips: softfloat, openwrt: "mips64_mips64r2 mips64_octeonplus", run-on: ubuntu-latest }
-          - { os: linux, arch: mips64le, gomips: hardfloat, debian: mips64el, rpm: mips64el, run-on: ubuntu-latest }
-          - { os: linux, arch: mips64le, gomips: softfloat, openwrt: "mips64el_mips64r2", run-on: ubuntu-latest }
-          - { os: linux, arch: s390x, debian: s390x, rpm: s390x, run-on: ubuntu-latest }
-          - { os: linux, arch: ppc64le, debian: ppc64el, rpm: ppc64le, run-on: ubuntu-latest }
-          - { os: linux, arch: riscv64, debian: riscv64, rpm: riscv64, openwrt: "riscv64_generic", run-on: ubuntu-latest }
-          - { os: linux, arch: loong64, debian: loongarch64, rpm: loongarch64, openwrt: "loongarch64_generic", run-on: ubuntu-latest }
-          - { os: windows, arch: amd64, run-on: ubuntu-latest }
-          - { os: windows, arch: amd64, legacy_go: true, run-on: ubuntu-latest }
-          # MinGW arm64 有问题: st_blksize redeclared other declaration of st_blksize
-          # - { os: windows, arch: arm64, run-on: ubuntu-24.04-arm }
-          - { os: darwin, arch: amd64, run-on: macos-latest }
-          - { os: darwin, arch: arm64, run-on: macos-latest }
-          - { os: android, arch: arm64, ndk: "aarch64-linux-android21", run-on: ubuntu-latest }
-          - { os: android, arch: arm, ndk: "armv7a-linux-androideabi21", run-on: ubuntu-latest }
-          - { os: android, arch: amd64, ndk: "x86_64-linux-android21", run-on: ubuntu-latest }
-          - { os: android, arch: "386", ndk: "i686-linux-android21", run-on: ubuntu-latest }
+        include: ${{ fromJSON(needs.calculate_version.outputs.matrix) }}
+      fail-fast: false
     steps:
       - name: Checkout
         uses: actions/checkout@eef61447b9ff4aafe5dcd4e0bbf5d482be7e7871 # v4

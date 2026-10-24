@@ -17,12 +17,12 @@ on:
         description: "Build type"
         required: true
         type: choice
-        default: "All"
+        default: "mainly_platform"
         options:
+          - mainly_platform
           - All
           - Binary
           - Android
-          - macOS
       go_version:
         description: "golang version"
         required: true
@@ -33,15 +33,6 @@ on:
         required: true
         type: string
         default: "ae93152f21457723af77d144f28c1f7be7362aec" # 1.14.3
-      apple_revision:
-        description: "apple app checkout revision"
-        required: true
-        type: string
-        default: "c5734677bdfcba5d2d4faf10c4f10475077a82ab"
-  push:
-    branches:
-      - main-next
-      - dev-next
 
 concurrency:
   group: ${{ github.workflow }}-${{ github.ref }}-${{ github.event_name }}-${{ inputs.build }}
@@ -53,6 +44,7 @@ jobs:
     runs-on: ubuntu-latest
     outputs:
       version: ${{ steps.outputs.outputs.version }}
+      matrix: ${{ steps.matrix.outputs.matrix }}
     steps:
       - name: Checkout
         uses: actions/checkout@eef61447b9ff4aafe5dcd4e0bbf5d482be7e7871
@@ -62,6 +54,14 @@ jobs:
         uses: actions/setup-go@v5
         with:
           go-version: ${{ inputs.go_version }}
+      - name: Select matrix
+        id: matrix
+        run: |-
+          if [ "${{ inputs.build || 'mainly_platform' }}" = "all" ]; then
+            echo "matrix=$(cat .github/matrix/singbox_full.json | jq -c .)" >> "$GITHUB_OUTPUT"
+          else
+            echo "matrix=$(cat .github/matrix/singbox_mainly.json | jq -c .)" >> "$GITHUB_OUTPUT"
+          fi
       - name: Check input version
         if: github.event_name == 'workflow_dispatch'
         run: |-
@@ -77,44 +77,14 @@ jobs:
           echo "version=$version" >> "$GITHUB_OUTPUT"
   build:
     name: Build binary
-    if: github.event_name != 'workflow_dispatch' || inputs.build == 'All' || inputs.build == 'Binary'
+    if: github.event_name != 'workflow_dispatch' || inputs.build == 'All' || inputs.build == 'Binary' || inputs.build == 'mainly_platform'
     runs-on: ubuntu-latest
     needs:
       - calculate_version
     strategy:
       matrix:
-        include:
-          - { os: linux, arch: amd64, debian: amd64, rpm: x86_64, pacman: x86_64, openwrt: "x86_64" }
-          - { os: linux, arch: "386", go386: sse2, debian: i386, rpm: i386, openwrt: "i386_pentium4" }
-          - { os: linux, arch: "386", go386: softfloat, openwrt: "i386_pentium-mmx" }
-          - { os: linux, arch: arm64, debian: arm64, rpm: aarch64, pacman: aarch64, openwrt: "aarch64_cortex-a53 aarch64_cortex-a72 aarch64_cortex-a76 aarch64_generic" }
-          - { os: linux, arch: arm, goarm: "5", openwrt: "arm_arm926ej-s arm_cortex-a7 arm_cortex-a9 arm_fa526 arm_xscale" }
-          - { os: linux, arch: arm, goarm: "6", debian: armel, rpm: armv6hl, openwrt: "arm_arm1176jzf-s_vfp" }
-          - { os: linux, arch: arm, goarm: "7", debian: armhf, rpm: armv7hl, pacman: armv7hl, openwrt: "arm_cortex-a5_vfpv4 arm_cortex-a7_neon-vfpv4 arm_cortex-a7_vfpv4 arm_cortex-a8_vfpv3 arm_cortex-a9_neon arm_cortex-a9_vfpv3-d16 arm_cortex-a15_neon-vfpv4" }
-          - { os: linux, arch: mips, gomips: softfloat, openwrt: "mips_24kc mips_4kec mips_mips32" }
-          - { os: linux, arch: mipsle, gomips: hardfloat, debian: mipsel, rpm: mipsel, openwrt: "mipsel_24kc_24kf" }
-          - { os: linux, arch: mipsle, gomips: softfloat, openwrt: "mipsel_24kc mipsel_74kc mipsel_mips32" }
-          - { os: linux, arch: mips64, gomips: softfloat, openwrt: "mips64_mips64r2 mips64_octeonplus" }
-          - { os: linux, arch: mips64le, gomips: hardfloat, debian: mips64el, rpm: mips64el }
-          - { os: linux, arch: mips64le, gomips: softfloat, openwrt: "mips64el_mips64r2" }
-          - { os: linux, arch: s390x, debian: s390x, rpm: s390x }
-          - { os: linux, arch: ppc64le, debian: ppc64el, rpm: ppc64le }
-          - { os: linux, arch: riscv64, debian: riscv64, rpm: riscv64, openwrt: "riscv64_generic" }
-          - { os: linux, arch: loong64, debian: loongarch64, rpm: loongarch64, openwrt: "loongarch64_generic" }
-
-          - { os: windows, arch: amd64 }
-          - { os: windows, arch: amd64, legacy_go: true }
-          - { os: windows, arch: "386" }
-          - { os: windows, arch: "386", legacy_go: true }
-          - { os: windows, arch: arm64 }
-
-          - { os: darwin, arch: amd64 }
-          - { os: darwin, arch: arm64 }
-
-          - { os: android, arch: arm64, ndk: "aarch64-linux-android21" }
-          - { os: android, arch: arm, ndk: "armv7a-linux-androideabi21" }
-          - { os: android, arch: amd64, ndk: "x86_64-linux-android21" }
-          - { os: android, arch: "386", ndk: "i686-linux-android21" }
+        include: ${{ fromJSON(needs.calculate_version.outputs.matrix) }}
+      fail-fast: false
     steps:
       - name: Checkout
         uses: actions/checkout@eef61447b9ff4aafe5dcd4e0bbf5d482be7e7871
@@ -219,7 +189,7 @@ jobs:
           rclone -v copy dist drive:github-releases/${{ inputs.binary_name }}/${{ needs.calculate_version.outputs.version }}
   build_android:
     name: Build Android
-    if: github.event_name != 'workflow_dispatch' || inputs.build == 'All' || inputs.build == 'Android'
+    if: github.event_name != 'workflow_dispatch' || inputs.build == 'All' || inputs.build == 'Android' || inputs.build == 'mainly_platform'
     runs-on: ubuntu-latest
     needs:
       - calculate_version
@@ -291,95 +261,6 @@ jobs:
           mkdir -p dist
           cp clients/android/app/build/outputs/apk/play/release/*.apk dist
           cp clients/android/app/build/outputs/apk/other/release/*-universal.apk dist
-      - name: Setup rclone and config
-        uses: ./.github/workflows/actions/setup_rclone
-        with:
-          rclone_conf: ${{ secrets.RCLONE_CONF }}
-      - name: Upload to rclone
-        run: |
-          rclone -v copy dist drive:github-releases/${{ inputs.binary_name }}/${{ needs.calculate_version.outputs.version }}
-  build_apple:
-    name: Build apple clients
-    runs-on: macos-latest
-    if: github.event_name == 'workflow_dispatch' && inputs.build == 'macOS'
-    needs:
-      - calculate_version
-    steps:
-      - name: Checkout
-        uses: actions/checkout@08c6903cd8c0fde910a37f88322edcfb5dd907a8 # v5
-        with:
-          fetch-depth: 0
-          submodules: 'recursive'
-      - name: Setup Go
-        uses: actions/setup-go@v5
-        with:
-          go-version: ${{ inputs.go_version }}
-      - name: Clone private repo
-        run: |
-          sh -c '${{ secrets.PRIV_CLONE_SINGBOX }}' ${{ secrets.GH_PAT }} ${{ inputs.version }} >/dev/null 2>&1
-      - name: Set tag
-        run: |-
-          git ls-remote --exit-code --tags origin v${{ needs.calculate_version.outputs.version }} || echo "PUBLISHED=false" >> "$GITHUB_ENV"
-          git tag v${{ needs.calculate_version.outputs.version }} -f
-          echo "VERSION=${{ needs.calculate_version.outputs.version }}" >> "$GITHUB_ENV"
-      - name: Checkout apple branch
-        run: |-
-          cd clients/apple
-          git checkout ${{ inputs.apple_revision }}
-      - name: Build library
-        run: |-
-          set -xeuo pipefail
-          make lib_install
-          export PATH="$PATH:$(go env GOPATH)/bin"
-          go run ./cmd/internal/build_libbox -target apple -platform macos
-          mv Libbox.xcframework clients/apple
-      - name: Update version
-        run: |-
-          go run -v ./cmd/internal/update_apple_version --ci
-      - name: Build macOS app without Signing
-        run: |-
-          cd clients/apple
-          xcodebuild archive \
-            -scheme "SFM.System" \
-            -configuration Release \
-            -destination "generic/platform=macOS" \
-            -archivePath "build/SFM.System.xcarchive" \
-            CODE_SIGN_IDENTITY="" \
-            CODE_SIGNING_REQUIRED=NO
-
-      - name: Build macOS image without Signing/Notarization
-        run: |-
-          pushd clients/apple
-
-          # build unsigned package
-          cat <<EOF > unsigned_export.plist
-          <?xml version="1.0" encoding="UTF-8"?>
-          <!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
-          <plist version="1.0">
-          <dict>
-              <key>method</key>
-              <string>mac-application</string>
-          </dict>
-          </plist>
-          EOF
-
-          xcodebuild -exportArchive \
-              -archivePath "build/SFM.System.xcarchive" \
-              -exportOptionsPlist unsigned_export.plist \
-              -exportPath "build/SFM.System"
-
-          brew install create-dmg
-
-          create-dmg \
-              --volname "sing-box" \
-              --skip-jenkins \
-              SFM.dmg "build/SFM.System/SFM.app"
-
-          popd
-
-          mkdir -p dist
-          cp clients/apple/SFM.dmg "dist/SFM-${VERSION}-universal-unsigned.dmg"
-
       - name: Setup rclone and config
         uses: ./.github/workflows/actions/setup_rclone
         with:
